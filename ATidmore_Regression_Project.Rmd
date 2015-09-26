@@ -1,0 +1,103 @@
+---
+title: "Analysis of Factors Contributing to Vehicle MPG"
+author: "Austin Tidmore"
+date: "September 26, 2015"
+output: pdf_document
+---
+
+## Executive Summary
+As an analyst for Motor Trend magazine I am providing this report as an analysis of factors contributing to vehicle fuel efficiency (i.e. "MPG"). The analysis herein has been compiled from a dataset of 32 vehicles from 1973-74. 
+
+My research found that while a Manual transmission (as opposed to Autmatic) results in significantly better fuel efficiency, there were other variables in the data which explain the relationship with MPG better than just transmission type.
+
+The initial model shows an increase of 7.2 MPG for manual transmission cars but cannot explain much of the variability in MPG. The final model shows an increase of 2.9 MPG for manual transmission vehicles when weight and quarter-mile time are considered.
+
+To ensure that the results are legitimate, the Appendix (Figure 4) contains a plot of the model diagnostics. The residual values look randomly distributed (a sign of a good model), and the diagnostics do not show anything out of the ordinary.
+
+## Exploring the Data
+First we need to explore the key points of the dataset as well as start to understand the effect of Transmission type on MPG rating. The data will be loaded and slightly cleansed for analysis
+
+```{r message=FALSE}
+data(mtcars)
+mtcars$am <- as.factor(mtcars$am)
+mtcars$cyl <- as.factor(mtcars$cyl) 
+mtcars$vs <- as.factor(mtcars$vs) 
+require(ggplot2)
+```
+
+A summary of the data has been provided in the Appedix, Figure 1. The "am" field refers to the transmission type where "0" represents Automatic and "1" represents Manual. MPG values are in Miles per U.S. gallon.
+
+The Boxplot (Appendix, Fig. 2) indicates that the median MPG rating for manual transmission vehicles is higher. Also due to the non-overlap of the interquartile ranges I suspect that the higher median MPG for manuals would be statistically significant. This will be verified in the following section. 
+
+Since I suspect that more variables other than transmission type could help predict better MPG, I have analyzed a pairs plot for all variables in the dataset but have included a plot for only a few of the seemingly significant variables: weight, transmission and quarter-mile time. This is Figure 3.
+
+## Modeling the Relationships
+
+To quantify the increased MPG as it relates to transmission type we can build a simple linear model with MPG as the outcome and "am" as the regressor. The model's p-values will indicate a significant difference among transmission-type values as they are able to explain MPG values.
+
+```{r}
+base.lm <- lm(mpg ~ am, data = mtcars)
+
+summary(base.lm)$coef
+```
+A function to represent these results is: `MPG = 17.147 + 7.244*AM (for AM = 1 or 0)` This means that all things equal, a manual transmission car gets 7.244 MPG better than its automatic counterpart. I am not quite satisfied with the analysis, however, because the R-squared value indicates that only `r summary(base.lm)$r.squared` (or 36%) of the variability in MPG has been explained by transmission type. 
+
+For increased robustness in the model I created a linear model with all available variables, then I utilized R's ability to perform stepwise regression to build the "best" model. 
+
+```{r results='hide'}
+base.lm.all <- lm(mpg ~ . ,data = mtcars)
+
+best.lm <- step(base.lm.all, direction = "backward")
+```
+
+```{r}
+summary(base.lm.all)$coef
+```
+The model that includes all available variables to predict MPG is peculiar. None of the individual regressors are significant (according to their respective p-values) yet the entire model is significant. This is because our model has been overfit: numerous inter-related variables almost always guarantee a significant model.
+
+```{r}
+summary(best.lm)$coef
+```
+Performing step-wise regression on the model has shown that the most accurate way to predict MPG values is to consider vehicle weight, transmission type, and quarter-mile time. This model explains nearly 85% of the variance of MPG which is a great improvement from the initial model.
+
+```{r}
+anova(base.lm.all, base.lm, best.lm)
+```
+The results of our ANOVA comparison show that R generated the best linear model: where MPG is an outcome of weight ("wt"), transmission type ("am") and quarter-mile time ("qsec").
+
+
+
+
+# Appendix
+Figure 1: Dataset Summary
+```{r echo=FALSE}
+print("MPG:")
+summary(mtcars$mpg)
+print("Transmission:")
+summary(mtcars$am)
+print("Vehicle Weight:")
+summary(mtcars$wt)
+print("Quarter-mile Time:")
+summary(mtcars$qsec)
+```
+
+
+```{r echo=FALSE, out.width='\\textwidth'}
+g_am <- ggplot(data = mtcars, aes(x = am, y = mpg))
+g_am <- g_am + geom_boxplot(aes(fill = am)) + xlab("Transmission Type (0: Auto, 1: Manual)") 
+g_am <- g_am + ggtitle("Fig. 2 - MPG vs. Transmission Type")
+g_am
+```
+
+Fig. 3 - Pairs Plot  
+```{r echo = FALSE, out.width='\\textwidth'}
+pairs(mpg ~ am + qsec + wt , data = mtcars)
+```
+
+
+Fig. 4 - Best Model Diagnostics   
+```{r echo=FALSE}
+
+par(mfrow=c(2,2))
+plot(best.lm)
+```
